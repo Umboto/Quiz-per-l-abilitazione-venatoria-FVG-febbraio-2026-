@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<title>Quiz Caccia FVG</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+body {
+    margin: 0;
+    background: #000;
+    color: #fff;
+    font-family: Arial, sans-serif;
+    overflow-x: hidden;
+}
+
+#sidebar {
+    width: 260px;
+    background: #000;
+    height: 100vh;
+    position: fixed;
+    left: 0;
+    top: 0;
+    padding: 20px;
+    box-sizing: border-box;
+    overflow-y: auto;
+    border-right: 2px solid #0f9;
+}
+
+#sidebar h2 {
+    margin-top: 0;
+    font-size: 20px;
+    color: #0f9;
+}
+
+#sidebar button, #sidebar select {
+    width: 100%;
+    padding: 10px;
+    margin-top: 10px;
+    background: #111;
+    color: #fff;
+    border: 1px solid #444;
+    cursor: pointer;
+}
+
+#sidebar button:hover {
+    background: #222;
+}
+
+#mobileMenuBtn {
+    display: none;
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    background: #0f9;
+    color: #000;
+    padding: 10px 15px;
+    border: none;
+    font-size: 18px;
+    z-index: 9999;
+}
+
+#content {
+    margin-left: 260px;
+    padding: 20px;
+    background: #1a1a1a;
+    min-height: 100vh;
+}
+
+#questionBox {
+    background: #222;
+    padding: 20px;
+    border: 1px solid #333;
+    border-radius: 6px;
+}
+
+#answer {
+    margin-top: 15px;
+    white-space: pre-line;
+    color: #0f9;
+}
+
+#speciesImage {
+    margin-top: 20px;
+    display: none;
+}
+
+#imgWrapper {
+    width: 100%;
+    min-height: 250px;
+    background: #111;
+    border: 1px solid #444;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#imgEl {
+    max-width: 100%;
+    max-height: 350px;
+    display: none;
+}
+
+#imgLoading {
+    font-size: 14px;
+    color: #aaa;
+}
+
+@media (max-width: 800px) {
+    #mobileMenuBtn { display: block; }
+    #sidebar {
+        position: fixed;
+        width: 260px;
+        height: 100vh;
+        z-index: 9998;
+        transform: translateX(-100%);
+        transition: 0.3s;
+    }
+    #sidebar.open { transform: translateX(0); }
+    #content {
+        margin-left: 0;
+        padding-top: 60px;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<button id="mobileMenuBtn">☰ Menu</button>
+
+<div id="sidebar">
+    <h2>Modalità Quiz</h2>
+
+    <select id="modeSelect">
+        <option value="legge_regionale">Legge Regionale</option>
+        <option value="legge_nazionale">Legge Nazionale</option>
+        <option value="leggi_tutte">Tutte le Leggi</option>
+        <option value="specie_cacciabili">Specie Cacciabili (foto)</option>
+        <option value="specie_tutte">Tutte le Specie (foto)</option>
+        <option value="misturone">MISTURONE (tutto)</option>
+        <option value="stats">Statistiche</option>
+    </select>
+
+    <button id="btnNew">Nuova domanda</button>
+    <button id="btnReveal">Mostra risposta</button>
+</div>
+
+<div id="content">
+
+    <div id="questionBox">
+        <div id="questionText">Premi "Nuova domanda" per iniziare.</div>
+        <div id="answer"></div>
+
+        <!-- ACCURATEZZA -->
+        <div id="accuracyText" style="margin-top:5px; font-size:14px; color:#fff; display:none;">
+            Accuratezza: 0%
+        </div>
+    </div>
+
+    <div style="margin-top:15px;">
+        <button id="btnNewCenter">Nuova domanda</button>
+        <button id="btnRevealCenter">Mostra risposta</button>
+        <button id="btnCorrect" style="background:#064;">Giusto</button>
+        <button id="btnWrong" style="background:#600;">Sbagliato</button>
+        <button id="btnReset" style="background:#444;">Reset statistiche</button>
+    </div>
+
+    <div id="speciesImage">
+        <div id="imgWrapper">
+            <img id="imgEl" src="">
+            <div id="imgLoading">Carico immagine…</div>
+        </div>
+    </div>
+
+</div> <!-- fine #content -->
+
+<script>
+"use strict";
+
+function $(id){ return document.getElementById(id); }
+
+/* ===========================
+   LEGGE NAZIONALE 157/1992
+   =========================== */
+const LEGGE_NAZIONALE = [
+    {
+        domanda: "Ai sensi della Legge 157/1992, cos'è la fauna selvatica?",
+        risposta: "Specie di mammiferi e uccelli viventi stabilmente o temporaneamente in libertà naturale nel territorio nazionale. Patrimonio indisponibile dello Stato (art.1 c.1)."
+    },
+    {
+        domanda: "Cosa significa fauna selvatica omeoterma?",
+        risposta: "Specie a sangue caldo: mammiferi e uccelli viventi stabilmente o temporaneamente in libertà naturale (art.2)."
+    },
+    {
+        domanda: "Quali sono alcune specie particolarmente protette ai sensi della Legge 157/1992?",
+        risposta: "Mammiferi: lupo, sciacallo dorato, orso, martora, puzzola, gatto selvatico, foca monaca, cervo sardo, camoscio d'Abruzzo. Uccelli: tutti i rapaci diurni e notturni, tutti i picchi, tutte le cicogne."
+    },
+    {
+        domanda: "Quali mammiferi omeotermi non sono tutelati dalla Legge 157/1992?",
+        risposta: "Talpe, ratti, topi propriamente detti, nutrie, arvicole."
+    },
+    {
+        domanda: "Che cos'è l'uccellagione?",
+        risposta: "La cattura degli uccelli, sempre vietata (art.3). Eccezione: cattura per richiami vivi per 7 specie (art.4 c.4)."
+    },
+    {
+        domanda: "Quali sanzioni rischia chi pratica l'uccellagione?",
+        risposta: "Sanzioni penali e revoca della licenza di caccia."
+    },
+    {
+        domanda: "Quale percentuale di territorio agro-silvo-pastorale deve essere destinata alla protezione della fauna?",
+        risposta: "Dal 20% al 30% della regione; in Zona Alpi dal 10% al 20% (art.10 c.3)."
+    },
+    {
+        domanda: "Qual è la percentuale massima di territorio destinabile alla caccia privata?",
+        risposta: "Massimo 15% (in FVG massimo 10%)."
+    },
+    {
+        domanda: "Cosa sono le Zone di Ripopolamento e Cattura?",
+        risposta: "Aree sottratte alla caccia, destinate alla riproduzione e cattura della fauna per reintroduzione. Gestione regionale/provinciale."
+    },
+    {
+        domanda: "Chi istituisce oasi di protezione e zone di ripopolamento e cattura?",
+        risposta: "Le Regioni tramite il Piano Faunistico Venatorio."
+    },
+    {
+        domanda: "È consentita la caccia vagante nei terreni in attualità di coltivazione?",
+        risposta: "No. Vietata su terreni con colture erbacee da seme, frutteti, vigneti, uliveti fino al raccolto, soia, riso, mais da seme."
+    },
+    {
+        domanda: "Quali sono i vincoli venatori nelle colture erbacee e arboree?",
+        risposta: "Erba da seme, soia, riso, frutteti specializzati, uliveti e vigneti fino al raccolto."
+    },
+    {
+        domanda: "Differenza tra appostamento fisso e temporaneo?",
+        risposta: "Fisso: modifica stabile del sito, richiede consenso del proprietario. Temporaneo: nessuna modifica, nessuna autorizzazione."
+    },
+    {
+        domanda: "Quanti richiami vivi di cattura può usare un cacciatore?",
+        risposta: "Appostamento fisso: max 10 per specie, max 40 totali. Temporaneo: max 10 totali."
+    },
+    {
+        domanda: "Quante forme di caccia prevede la Legge 157/1992?",
+        risposta: "Tre: vagante in zona Alpi; appostamento fisso; altre forme nel territorio venabile programmato."
+    },
+    {
+        domanda: "Come viene definito l'esercizio venatorio dalla Legge 157/1992?",
+        risposta: "Ogni atto diretto all'abbattimento o cattura della fauna con mezzi consentiti; anche il vagare in attitudine di caccia."
+    },
+    {
+        domanda: "Cos'è un fondo chiuso ai sensi della Legge 157/1992?",
+        risposta: "Terreni chiusi da muro, rete ≥1,20 m, corsi d'acqua ≥1,50 m profondità e ≥3 m larghezza. Caccia vietata."
+    },
+    {
+        domanda: "Quali caratteristiche identificano un fondo chiuso?",
+        risposta: "Chiusura ≥1,20 m o corsi d'acqua profondi ≥1,50 m e larghi ≥3 m. Deve essere tabellato."
+    },
+    {
+        domanda: "Quali sanzioni può subire un cacciatore che viola la Legge 157/1992?",
+        risposta: "Sanzioni penali, amministrative e disciplinari."
+    },
+    {
+        domanda: "Quali mezzi sono consentiti per l'esercizio venatorio?",
+        risposta: "Fucili a canna liscia (max 2 colpi), semiautomatici, rigati ≥5,6 mm con bossolo ≥40 mm."
+    },
+    {
+        domanda: "Che caratteristiche devono avere le armi a canna liscia?",
+        risposta: "Canna liscia fino a due colpi, semiautomatici o a ripetizione con max 2 cartucce, calibro ≤12."
+    },
+    {
+        domanda: "Quali armi a canna liscia sono consentite?",
+        risposta: "Giustapposte, sovrapposte, basculanti, semiautomatiche (max 2 colpi), combinati e drilling."
+    },
+    {
+        domanda: "Che caratteristiche devono avere le armi a canna rigata?",
+        risposta: "Calibro ≥5,6 mm, bossolo ≥40 mm; vietate semiautomatiche simili ad armi automatiche e armi a percussione anulare ≤6 mm."
+    },
+    {
+        domanda: "Quali armi a canna rigata sono consentite?",
+        risposta: "Express, combinati, carabine, semiautomatici, drilling, basculanti."
+    },
+    {
+        domanda: "Quali sono le distanze minime per l'esercizio venatorio?",
+        risposta: "Oltre 100 m da abitazioni; oltre 50 m da ferrovie e strade carrozzabili."
+    },
+    {
+        domanda: "Quali distanze devono essere rispettate per lo sparo in direzione di abitazioni e strade?",
+        risposta: "Vietato sparare a meno di 150 m con arma liscia; o meno di 1,5 volte la gittata massima con altre armi."
+    },
+    {
+        domanda: "Quante giornate di caccia settimanali sono consentite?",
+        risposta: "Massimo 3. Martedì e venerdì sono giorni di silenzio venatorio."
+    },
+    {
+        domanda: "Quali sono i giorni di silenzio venatorio?",
+        risposta: "Martedì e venerdì."
+    },
+    {
+        domanda: "Quale documentazione deve portare con sé il cacciatore?",
+        risposta: "Licenza, tasse pagate, assicurazione, tesserino regionale."
+    },
+    {
+        domanda: "Chi rilascia la licenza di caccia e qual è la durata?",
+        risposta: "Il Questore. Durata: 5 anni."
+    },
+    {
+        domanda: "Cosa subordina il rilascio del tesserino regionale?",
+        risposta: "Il pagamento della tassa regionale."
+    },
+    {
+        domanda: "Chi può modificare i periodi di caccia?",
+        risposta: "Il Presidente del Consiglio dei Ministri, sentiti i Ministri competenti."
+    },
+    {
+        domanda: "Quali elementi caratterizzano la Zona Faunistica delle Alpi?",
+        risposta: "Presenza tipica di flora e fauna alpina; zona faunistica autonoma."
+    },
+    {
+        domanda: "A quale distanza da un valico montano è consentita la caccia?",
+        risposta: "Oltre 1 km."
+    },
+    {
+        domanda: "Quali specie non possono essere cacciate da appostamento?",
+        risposta: "Specie particolarmente protette e non incluse tra le cacciabili."
+    },
+    {
+        domanda: "Quale ungulato non può essere cacciato con cane da seguita?",
+        risposta: "Il camoscio."
+    },
+    {
+        domanda: "Quali uccisioni non sono considerate esercizio venatorio?",
+        risposta: "Quelle dovute a caso fortuito o forza maggiore."
+    },
+    {
+        domanda: "Come devono essere trasportate le armi nelle zone vietate alla caccia?",
+        risposta: "Scariche e in custodia."
+    },
+    {
+        domanda: "In quali zone la caccia è sempre vietata?",
+        risposta: "Parchi, riserve, ZRC, centri abitati e aree entro le distanze minime."
+    },
+    {
+        domanda: "Chi può predisporre piani di controllo della fauna?",
+        risposta: "Le Regioni, con metodi ecologici e parere ISPRA."
+    },
+    {
+        domanda: "Chi attua i piani di controllo della fauna?",
+        risposta: "Guardie venatorie provinciali; proprietari muniti di licenza; guardie forestali e comunali."
+    },
+    {
+        domanda: "Qual è l'orario giornaliero di caccia?",
+        risposta: "Da un'ora prima dell'alba al tramonto; selezione ungulati fino a un'ora dopo il tramonto."
+    },
+    {
+        domanda: "Chi svolge la vigilanza venatoria?",
+        risposta: "Guardie provinciali, volontarie riconosciute, Corpo Forestale, guardie dei parchi, polizia giudiziaria."
+    },
+    {
+        domanda: "Quali controlli possono svolgere le guardie venatorie?",
+        risposta: "Richiedere licenza, tesserino, assicurazione, armi e fauna abbattuta."
+    },
+    {
+        domanda: "Cosa non può essere sequestrato al cacciatore?",
+        risposta: "Il cane e i richiami vivi autorizzati."
+    },
+    {
+        domanda: "Cosa prevedono le sanzioni penali?",
+        risposta: "Arresto e/o ammenda."
+    },
+    {
+        domanda: "Cosa prevedono le sanzioni amministrative?",
+        risposta: "Sanzioni pecuniarie."
+    },
+    {
+        domanda: "Cosa prevedono le sanzioni disciplinari?",
+        risposta: "Sospensione o revoca del porto d’armi; sospensione dell’attività venatoria."
+    },
+    {
+        domanda: "Come può vietare la caccia il proprietario di un fondo?",
+        risposta: "Richiesta motivata alla Regione entro 30 giorni dal Piano Faunistico."
+    },
+    {
+        domanda: "Cos'è un Ambito Territoriale di Caccia (ATC)?",
+        risposta: "Unità territoriale sub-provinciale destinata alla caccia programmata."
+    },
+    {
+        domanda: "Quali sono i compiti dell'ATC?",
+        risposta: "Ricognizione fauna, miglioramento habitat, incentivi ai conduttori, gestione attività venatoria."
+    },
+    {
+        domanda: "A cosa è finalizzata la pianificazione faunistico-venatoria?",
+        risposta: "Conservazione capacità riproduttive, densità ottimale, riqualificazione habitat, regolazione prelievo."
+    },
+    {
+        domanda: "Quali sono i compiti dell’ISPRA?",
+        risposta: "Organo tecnico-scientifico per Stato, Regioni e Province in materia faunistica."
+    },
+    {
+        domanda: "Quali specie possono essere catturate per richiami vivi?",
+        risposta: "Allodola, cesena, tordo sassello, tordo bottaccio, merlo, pavoncella, colombaccio."
+    },
+    {
+        domanda: "Quali sono le caratteristiche dell'Azienda faunistico-venatoria?",
+        risposta: "Gestione privata della caccia, finalizzata al miglioramento della fauna."
+    },
+    {
+        domanda: "Quali sono le caratteristiche dell'Azienda agrituristico-venatoria?",
+        risposta: "Caccia solo su selvaggina di allevamento liberata, per tutta la stagione."
+    },
+    {
+        domanda: "Cosa sono i Centri pubblici di riproduzione della fauna?",
+        risposta: "Zone di ripopolamento e cattura destinate alla riproduzione naturale."
+    },
+    {
+        domanda: "Quali sono le date generali di apertura e chiusura della caccia?",
+        risposta: "Apertura: terza domenica di settembre. Chiusura: 31 gennaio. In FVG: 10 settembre – 31 gennaio."
+    },
+    {
+        domanda: "Chi emana il calendario venatorio?",
+        risposta: "Le Regioni, sentito ISPRA, entro il 15 giugno."
+    },
+    {
+        domanda: "Quali appostamenti fissi non vincolano la forma di caccia?",
+        risposta: "Altane per selezione e appostamenti ai colombacci."
+    },
+    {
+        domanda: "Che caratteristiche devono avere i richiami vivi?",
+        risposta: "Devono essere anellati e riconoscibili."
+    },
+    {
+        domanda: "Quali richiami sono vietati?",
+        risposta: "Richiami acustici elettrici, elettronici, digitali o elettromeccanici."
+    },
+    {
+        domanda: "Qual è la percentuale di territorio protetto nella Zona Alpi?",
+        risposta: "Dal 10% al 20%."
+    },
+    {
+        domanda: "Chi stabilisce l'indice di densità venatoria?",
+        risposta: "Il Ministero dell'Agricoltura, con aggiornamento quinquennale."
+    },
+    {
+        domanda: "Entro quando va comunicata l'opzione di caccia?",
+        risposta: "Entro il 31 marzo."
+    },
+    {
+        domanda: "A quale forma è associato l'appostamento temporaneo?",
+        risposta: "Alla caccia vagante."
+    },
+    {
+        domanda: "Quante forme di caccia può scegliere il cacciatore?",
+        risposta: "Una sola."
+    },
+    {
+        domanda: "Entro quale termine si può richiedere l'esclusione di un fondo?",
+        risposta: "Entro 30 giorni dall'approvazione del Piano Faunistico."
+    },
+    {
+        domanda: "Quando la Regione può accogliere la richiesta di esclusione di un fondo?",
+        risposta: "Se non ostacola la pianificazione o tutela colture specializzate o attività di interesse rilevante."
+    },
+    {
+        domanda: "Quali obblighi ha il proprietario di un fondo escluso?",
+        risposta: "Tabellare il perimetro con tabelle esenti da imposte."
+    },
+    {
+        domanda: "Il proprietario di un fondo chiuso può cacciare al suo interno?",
+        risposta: "No, mai."
+    },
+    {
+        domanda: "Entro quale data le Regioni pubblicano il calendario venatorio?",
+        risposta: "Entro il 15 giugno."
+    },
+    {
+        domanda: "In quali luoghi gli organi accertatori non possono esercitare vigilanza?",
+        risposta: "Fuori dalla loro zona di competenza; le guardie volontarie non possono cacciare durante il servizio."
+    }
+];
+
+/* ===========================
+   LEGGE REGIONALE FVG
+   =========================== */
+const LEGGE_REGIONALE = [
+    {
+        domanda: "Ai sensi della L.R. 6/2008, da chi viene rilasciato il tesserino regionale di caccia e in quali casi viene sospeso o ritirato?",
+        risposta: "È rilasciato annualmente dalla Regione. Può essere sospeso o ritirato nei casi previsti dall’art. 30 c.1 L.157/92 o in caso di condanna in primo grado. Può essere oggetto delle sanzioni accessorie dell’art. 31 L.157/92 e art. 38 L.R. 6/2008."
+    },
+    {
+        domanda: "Quali annotazioni devono essere effettuate sul tesserino regionale di caccia e come si eseguono le correzioni?",
+        risposta: "Data uscita, tipo di caccia, località fuori riserva, abbattimenti e spari in selezione. Annotazioni leggibili con inchiostro indelebile; correzioni lasciando visibile l’originale."
+    },
+    {
+        domanda: "A cosa è subordinato il rilascio del tesserino regionale di caccia e quali annotazioni devono essere effettuate?",
+        risposta: "Porto d’armi, assicurazione valida, tassa regionale pagata. Annotazioni: data, tipo caccia, località, abbattimenti, spari in selezione. Correzioni leggibili."
+    },
+    {
+        domanda: "Cosa sono le Riserve di caccia e quali organi le compongono?",
+        risposta: "Associazioni senza scopo di lucro che gestiscono il territorio venatorio. Organi: Assemblea dei soci e Direttore. Attuano il PVD e organizzano l’esercizio venatorio."
+    },
+    {
+        domanda: "A chi è consentito l’esercizio venatorio in FVG secondo la L.R. 6/2008?",
+        risposta: "Ammessi alle Riserve, titolari di permesso annuale, concessionari e invitati, cacciatori esteri maggiorenni con documenti validi."
+    },
+    {
+        domanda: "A chi è consentito l’esercizio venatorio nelle Aziende Faunistico-Venatorie?",
+        risposta: "Concessionari, consorziati, proprietari o conduttori, titolari di permessi annuali o giornalieri e invitati."
+    },
+    {
+        domanda: "Quale atto deve essere approvato affinché in una Riserva possa svolgersi l’attività venatoria?",
+        risposta: "Regolamento di fruizione venatoria esecutivo e Piano di prelievo della specie."
+    },
+    {
+        domanda: "Cosa disciplina e chi approva il Regolamento di fruizione venatoria?",
+        risposta: "Disciplina prelievo ed esercizio venatorio. È adottato dall’Assemblea dei soci e approvato dal Distretto venatorio."
+    },
+    {
+        domanda: "Cos’è il Distretto venatorio, da chi è composto e quali compiti ha?",
+        risposta: "Unità territoriali omogenee. Composto dai rappresentanti delle Riserve e da 1/10 rappresentante degli istituti privati. Compiti: PVD, coordinamento gestione, regolamenti, censimenti, mostre trofei."
+    },
+    {
+        domanda: "Cos’è il Piano Venatorio Distrettuale (PVD)?",
+        risposta: "Atto di programmazione che attua strategie del PFR e disciplina aspetti pubblicistici dell’esercizio venatorio."
+    },
+    {
+        domanda: "Cos’è il Piano Faunistico Regionale (PFR) e da chi viene predisposto?",
+        risposta: "Predisposto dalla Regione. Obiettivi: tutela fauna, biodiversità, gestione prelievo nel rispetto delle tradizioni locali."
+    },
+    {
+        domanda: "Come è diviso il territorio agro-silvo-pastorale ai fini venatori?",
+        risposta: "In Riserve di caccia, aziende faunistico-venatorie e agri-turistico-venatorie, individuate nel PFR."
+    },
+    {
+        domanda: "Cos’è la caccia di selezione secondo la L.R. 14/1987?",
+        risposta: "Caccia agli ungulati per qualità, sesso e classe, senza cane, con mezzi L.157/92, tutti i giorni tranne martedì e venerdì."
+    },
+    {
+        domanda: "A cosa è subordinata la caccia di selezione agli ungulati?",
+        risposta: "Abilitazione specifica. I non abilitati possono esercitarla per un anno se iscritti all’esame e accompagnati da un tutore abilitato."
+    },
+    {
+        domanda: "Quali caratteristiche devono avere gli appostamenti per la caccia agli ungulati?",
+        risposta: "In legno, asportabili, altezza ≤9 m, piano ≤3 m². Non richiedono autorizzazioni edilizie o paesaggistiche."
+    },
+    {
+        domanda: "Periodo di caccia selettiva al Capriolo?",
+        risposta: "Dal 15 maggio al 15 gennaio."
+    },
+    {
+        domanda: "Periodo di caccia selettiva al Camoscio?",
+        risposta: "Dal 16 agosto al 31 dicembre."
+    },
+    {
+        domanda: "Periodo di caccia selettiva al Cervo?",
+        risposta: "Dal 16 agosto al 15 gennaio."
+    },
+    {
+        domanda: "Periodo di caccia selettiva al Muflone?",
+        risposta: "Dal 16 agosto al 15 gennaio."
+    },
+    {
+        domanda: "Periodo di caccia selettiva al Cinghiale?",
+        risposta: "Dal 15 maggio al 15 gennaio (aggiunta: 1/4–14/5)."
+    },
+    {
+        domanda: "Periodo di caccia selettiva al Daino?",
+        risposta: "Dal 16 agosto al 15 gennaio."
+    },
+    {
+        domanda: "Orario caccia selettiva al Cervo?",
+        risposta: "Da due ore prima dell’alba a due ore dopo il tramonto."
+    },
+    {
+        domanda: "Orario caccia selettiva al Muflone?",
+        risposta: "Da un’ora prima dell’alba al tramonto."
+    },
+    {
+        domanda: "Orario caccia selettiva al Cinghiale?",
+        risposta: "Da due ore prima dell’alba a quattro ore dopo il tramonto, estesa fino alle 24."
+    },
+    {
+        domanda: "Orario caccia selettiva al Capriolo?",
+        risposta: "Da due ore prima dell’alba a due ore dopo il tramonto."
+    },
+    {
+        domanda: "Orario caccia selettiva al Daino?",
+        risposta: "Da un’ora prima dell’alba al tramonto."
+    },
+    {
+        domanda: "Orario caccia selettiva al Camoscio?",
+        risposta: "Da un’ora prima dell’alba al tramonto."
+    },
+    {
+        domanda: "Cos’è la girata e a cosa serve?",
+        risposta: "Metodo con cane da traccia al guinzaglio per contenere il cinghiale. Dal 15 novembre al 15 gennaio."
+    },
+    {
+        domanda: "Cos’è il calendario venatorio regionale secondo L.R. 24/1996?",
+        risposta: "È l’insieme dei periodi di caccia stabiliti dalla legge regionale, da un’ora prima dell’alba al tramonto."
+    },
+    {
+        domanda: "Cos’è la caccia tradizionale agli ungulati e quali specie prevede?",
+        risposta: "Caccia con cani da seguita da parte di cacciatori abilitati. Specie: capriolo, cervo, cinghiale."
+    },
+    {
+        domanda: "Periodo caccia tradizionale al Capriolo?",
+        risposta: "Seconda domenica di settembre – 5 novembre."
+    },
+    {
+        domanda: "Periodo caccia tradizionale al Cervo?",
+        risposta: "1 ottobre – 30 novembre."
+    },
+    {
+        domanda: "Periodo caccia tradizionale al Cinghiale?",
+        risposta: "Dal 10 ottobre al 31 gennaio (dal 2025)."
+    },
+    {
+        domanda: "Orario caccia tradizionale agli ungulati?",
+        risposta: "Da un’ora prima dell’alba al tramonto."
+    },
+    {
+        domanda: "Periodo caccia alla Volpe e carniere?",
+        risposta: "Terza domenica di settembre – 31 gennaio. Nessun limite salvo regolamento."
+    },
+    {
+        domanda: "Orario caccia fauna stanziale e migratoria?",
+        risposta: "Da un’ora prima dell’alba al tramonto; anatidi alla posta fino a un’ora dopo."
+    },
+    {
+        domanda: "È consentito cacciare su neve?",
+        risposta: "No, salvo selezione ungulati e alcune eccezioni in Zona Alpi."
+    },
+    {
+        domanda: "Specie vietate al ripopolamento in FVG?",
+        risposta: "Minilepre, pernice rossa, colino della Virginia, cinghiale e specie non autoctone."
+    },
+    {
+        domanda: "Cos’è il contrassegno inamovibile e quando si applica?",
+        risposta: "Sigillo plastico da applicare all’arto posteriore degli ungulati subito dopo l’annotazione. In FVG anche ai tetraonidi."
+    },
+    {
+        domanda: "Quanti anatidi si possono abbattere al giorno?",
+        risposta: "Massimo 25 anseriformi."
+    },
+    {
+        domanda: "Esempio caradriformi/beccacce (1 folaga, 3 beccacce, 1 combattente, 2 beccaccini): quante pavoncelle restano?",
+        risposta: "1 pavoncella (max 7 caradriformi)."
+    },
+    {
+        domanda: "Esempio caradriformi (2 folaghe, 2 gallinelle, 3 beccaccini, 1 frullino, 3 pavoncelle): quante beccacce restano?",
+        risposta: "Nessuna (7 caradriformi raggiunti)."
+    },
+    {
+        domanda: "Esempio caradriformi (2 pavoncelle, 1 combattente, 3 beccaccini, 1 gallinella): quante beccacce restano?",
+        risposta: "1 beccaccia."
+    },
+    {
+        domanda: "Esempio caradriformi (4 pavoncelle, 3 beccaccini): quante beccacce restano?",
+        risposta: "Nessuna."
+    },
+    {
+        domanda: "Esempio anatidi (5 germani, 3 folaghe, 1 gallinella, 1 porciglione): quanti anatidi restano?",
+        risposta: "15 anatidi."
+    },
+    {
+        domanda: "Esempio anatidi (1 codone, 3 canapiglie, 4 germani, 1 folaga): quanti anatidi restano?",
+        risposta: "16 anatidi."
+    },
+    {
+        domanda: "Esempio anatidi (3 germani, 5 fischioni, 1 alzavola, 1 folaga): quanti colombacci restano?",
+        risposta: "15 colombacci."
+    },
+    {
+        domanda: "Quanti cani possono essere impiegati nella caccia tradizionale ai cervidi?",
+        risposta: "Nessuna limitazione, purché certificati."
+    },
+    {
+        domanda: "Cos’è una cacciata o seguita?",
+        risposta: "Azione che inizia con il rilascio dei cani e termina con il loro recupero."
+    },
+    {
+        domanda: "Periodo addestramento cani da ferma in Riserva?",
+        risposta: "1 agosto – ultimo giorno di febbraio, solo soci. Zona addestramento: tutto l’anno."
+    },
+    {
+        domanda: "Periodo addestramento cani da seguita?",
+        risposta: "15 agosto – ultimo giorno di febbraio, su lepre, cinghiale, cervo e capriolo."
+    },
+    {
+        domanda: "Addestramento cani nella zona addestramento?",
+        risposta: "Tutto l’anno, per soci e residenti non soci delle riserve confinanti."
+    },
+    {
+        domanda: "A chi compete l’ammissione e trasferimento dei cacciatori alle Riserve?",
+        risposta: "Alla Regione. Numero massimo determinato con PFR e deliberazione della Giunta."
+    },
+    {
+        domanda: "Come deve comportarsi il cacciatore vicino a strade carrozzabili o centri abitati?",
+        risposta: "Fucile scarico e aperto."
+    },
+    {
+        domanda: "Caratteristiche delle strade carrozzabili?",
+        risposta: "Fondo stabilizzato bituminoso o cementizio."
+    },
+    {
+        domanda: "A cosa servono le zone di rifugio delle Riserve?",
+        risposta: "Incremento delle popolazioni stabili di selvaggina."
+    },
+    {
+        domanda: "Limitazioni nelle ZPS/ZSC?",
+        risposta: "Divieto pallini di piombo nelle zone umide e fascia 150 m; possibili restrizioni su calendario e specie."
+    },
+    {
+        domanda: "Come si caccia in laguna e mare secondo L.R. 6/2008?",
+        risposta: "Da natanti fermi e ancorati (collegia). Recupero selvaggina con fucile scarico."
+    },
+    {
+        domanda: "Come deve comportarsi il cacciatore prima/dopo orari venatori?",
+        risposta: "Fucile scarico e in custodia."
+    },
+    {
+        domanda: "Quante volte può essere invitato un cacciatore ammesso a una Riserva?",
+        risposta: "5 volte. Carniere stanziale a carico invitante; migratoria 25 capi ciascuno."
+    },
+    {
+        domanda: "Quante volte può essere invitato un cacciatore non ammesso?",
+        risposta: "10 volte. Stesse regole carniere."
+    },
+    {
+        domanda: "Come devono comportarsi invitante e invitato?",
+        risposta: "Devono cacciare insieme. Stanziale a carico invitante; migratoria 25 capi ciascuno."
+    },
+    {
+        domanda: "Quanti cacciatori può invitare un ammesso alla Riserva?",
+        risposta: "Uno al giorno. Stesse regole carniere."
+    },
+    {
+        domanda: "Caratteristiche strade carrozzabili e comportamento del cacciatore?",
+        risposta: "Fondo bituminoso/cementizio; attraversamento con fucile scarico e aperto."
+    },
+    {
+        domanda: "La Convenzione di Parigi riguarda?",
+        risposta: "Protezione degli uccelli utili all’agricoltura."
+    },
+    {
+        domanda: "La Convenzione di Berna riguarda?",
+        risposta: "Conservazione della vita selvatica e dei biotopi in Europa."
+    },
+    {
+        domanda: "La Convenzione di Washington (CITES) riguarda?",
+        risposta: "Commercio internazionale delle specie minacciate."
+    },
+    {
+        domanda: "La Convenzione di Ramsar riguarda?",
+        risposta: "Zone umide di importanza internazionale, habitat degli uccelli acquatici."
+    }
+];
+/* ===========================
+   SPECIES (ordine fisso = foto)
+   =========================== */
+const SPECIES = [
+    { specie:"tuffetto", stato:"protetta", ordine:"podicipediformi", famiglia:"podicipiedi" },
+    { specie:"svasso maggiore", stato:"protetta", ordine:"podicipediformi", famiglia:"podicipiedi" },
+    { specie:"garzetta", stato:"protetta", ordine:"ciconiformi", famiglia:"ardeidi" },
+    { specie:"tarabuso", stato:"protetta", ordine:"ciconiformi", famiglia:"ardeidi" },
+    { specie:"tarabusino", stato:"protetta", ordine:"ciconiformi", famiglia:"ardeidi" },
+    { specie:"germano reale", stato:"cacciabile", ordine:"aseriformi", famiglia:"anatidi" },
+    { specie:"codone", stato:"cacciabile", ordine:"aseriformi", famiglia:"anatidi" },
+    { specie:"fischione", stato:"cacciabile", ordine:"aseriformi", famiglia:"anatidi" },
+    { specie:"quattrocchi", stato:"protetta", ordine:"aseriformi", famiglia:"anatidi" },
+    { specie:"canapiglia", stato:"cacciabile", ordine:"aseriformi", famiglia:"anatidi" },
+    { specie:"moretta", stato:"cacciabile", ordine:"aseriformi", famiglia:"anatidi" },
+    { specie:"moretta tabaccata", stato:"protetta", ordine:"aseriformi", famiglia:"anatidi" },
+    { specie:"moriglione", stato:"cacciabile", ordine:"aseriformi", famiglia:"anatidi" },
+    { specie:"mestolone", stato:"cacciabile", ordine:"aseriformi", famiglia:"anatidi" },
+    { specie:"alzavola", stato:"cacciabile", ordine:"aseriformi", famiglia:"anatidi" },
+    { specie:"marzaiola", stato:"cacciabile", ordine:"aseriformi", famiglia:"anatidi" },
+    { specie:"fagiano", stato:"cacciabile", ordine:"galliformi", famiglia:"fasianidi" },
+    { specie:"starna", stato:"cacciabile", ordine:"galliformi", famiglia:"fasianidi" },
+    { specie:"pernice rossa", stato:"cacciabile", ordine:"galliformi", famiglia:"fasianidi" },
+    { specie:"coturnice", stato:"cacciabile", ordine:"galliformi", famiglia:"fasianidi" },
+    { specie:"quaglia comune", stato:"cacciabile", ordine:"galliformi", famiglia:"fasianidi" },
+    { specie:"fagiano di monte (gallo forcello)", stato:"cacciabile", ordine:"galliformi", famiglia:"fasianidi" },
+    { specie:"pernice bianca", stato:"cacciabile", ordine:"galliformi", famiglia:"tetraonidi" },
+    { specie:"francolino di monte", stato:"protetta", ordine:"galliformi", famiglia:"tetraonidi" },
+    { specie:"porciglione", stato:"cacciabile", ordine:"gruiformi", famiglia:"rallidi" },
+    { specie:"gallinella d’acqua", stato:"cacciabile", ordine:"gruiformi", famiglia:"rallidi" },
+    { specie:"re di quaglie", stato:"protetta", ordine:"gruiformi", famiglia:"rallidi" },
+    { specie:"avocetta", stato:"protetta", ordine:"caradriformi", famiglia:"recurvirostridi" },
+    { specie:"cavaliere d’italia", stato:"protetta", ordine:"caradriformi", famiglia:"recurvirostridi" },
+    { specie:"occhione", stato:"protetta", ordine:"caradriformi", famiglia:"burinidi" },
+    { specie:"pavoncella", stato:"cacciabile", ordine:"caradriformi", famiglia:"caradridi" },
+    { specie:"beccaccia", stato:"cacciabile", ordine:"caradriformi", famiglia:"scolopacidi" },
+    { specie:"beccaccino", stato:"cacciabile", ordine:"caradriformi", famiglia:"scolopacidi" },
+    { specie:"frullino", stato:"cacciabile", ordine:"caradriformi", famiglia:"scolopacidi" },
+    { specie:"tortora dal collare", stato:"protetta", ordine:"columbiformi", famiglia:"columbidi" },
+    { specie:"tortora selvatica", stato:"cacciabile", ordine:"columbiformi", famiglia:"columbidi" },
+    { specie:"colombaccio", stato:"cacciabile", ordine:"columbiformi", famiglia:"columbidi" },
+    { specie:"cuculo", stato:"protetta", ordine:"cuculiformi", famiglia:"cuculidi" },
+    { specie:"martin pescatore", stato:"protetta", ordine:"coraciformi", famiglia:"alcedinidi" },
+    { specie:"upupa", stato:"protetta", ordine:"coraciformi", famiglia:"upupidi" },
+    { specie:"torcicollo", stato:"protetta", ordine:"piciformi", famiglia:"picidi" },
+    { specie:"picchio verde", stato:"protetta", ordine:"piciformi", famiglia:"picidi" },
+    { specie:"picchio rosso maggiore", stato:"protetta", ordine:"piciformi", famiglia:"picidi" },
+    { specie:"allodola", stato:"cacciabile", ordine:"passeriformi", famiglia:"alaudidi" },
+    { specie:"cappellaccia", stato:"protetta", ordine:"passeriformi", famiglia:"alaudidi" },
+    { specie:"ballerina bianca", stato:"protetta", ordine:"passeriformi", famiglia:"motacillidi" },
+    { specie:"ballerina gialla", stato:"protetta", ordine:"passeriformi", famiglia:"motacillidi" },
+    { specie:"prispolone", stato:"protetta", ordine:"passeriformi", famiglia:"motacillidi" },
+    { specie:"cutrettola", stato:"protetta", ordine:"passeriformi", famiglia:"motacillidi" },
+    { specie:"regolo", stato:"protetta", ordine:"passeriformi", famiglia:"regulidi" },
+    { specie:"beccofrusone", stato:"protetta", ordine:"passeriformi", famiglia:"bombicillidi" },
+    { specie:"passera scopaiola", stato:"protetta", ordine:"passeriformi", famiglia:"prunellidi" },
+    { specie:"cesena", stato:"cacciabile", ordine:"passeriformi", famiglia:"turdidi" },
+    { specie:"tordo bottaccio", stato:"cacciabile", ordine:"passeriformi", famiglia:"turdidi" },
+    { specie:"tordo sassello", stato:"cacciabile", ordine:"passeriformi", famiglia:"turdidi" },
+    { specie:"pettirosso", stato:"protetta", ordine:"passeriformi", famiglia:"turdidi" },
+    { specie:"stiaccino", stato:"protetta", ordine:"passeriformi", famiglia:"turdidi" },
+    { specie:"tordela", stato:"protetta", ordine:"passeriformi", famiglia:"turdidi" },
+    { specie:"merlo dal collare", stato:"protetta", ordine:"passeriformi", famiglia:"turdidi" },
+    { specie:"capinera", stato:"protetta", ordine:"passeriformi", famiglia:"silvidi" },
+    { specie:"codirosso comune", stato:"protetta", ordine:"passeriformi", famiglia:"muscicapidi" },
+    { specie:"codirosso spazzacamino", stato:"protetta", ordine:"passeriformi", famiglia:"muscicapidi" },
+    { specie:"culbianco", stato:"protetta", ordine:"passeriformi", famiglia:"muscicapidi" },
+    { specie:"usignolo", stato:"protetta", ordine:"passeriformi", famiglia:"muscicapidi" },
+    { specie:"cinciallegra", stato:"protetta", ordine:"passeriformi", famiglia:"paridi" },
+    { specie:"cinciarella", stato:"protetta", ordine:"passeriformi", famiglia:"paridi" },
+    { specie:"passera europea", stato:"protetta", ordine:"passeriformi", famiglia:"ploceidi" },
+    { specie:"passera mattugia", stato:"protetta", ordine:"passeriformi", famiglia:"ploceidi" },
+    { specie:"codibugnolo", stato:"protetta", ordine:"passeriformi", famiglia:"egitalidi" },
+    { specie:"rigogolo", stato:"protetta", ordine:"passeriformi", famiglia:"oriolidi" },
+    { specie:"averla maggiore", stato:"protetta", ordine:"passeriformi", famiglia:"lanidi" },
+    { specie:"averla piccola", stato:"protetta", ordine:"passeriformi", famiglia:"lanidi" },
+    { specie:"storno", stato:"protetta", ordine:"passeriformi", famiglia:"sturnidi" },
+    { specie:"cornacchia nera", stato:"cacciabile", ordine:"passeriformi", famiglia:"corvidi" },
+    { specie:"cornacchia grigia", stato:"cacciabile", ordine:"passeriformi", famiglia:"corvidi" },
+    { specie:"gazza", stato:"cacciabile", ordine:"passeriformi", famiglia:"corvidi" },
+    { specie:"ghiandaia", stato:"cacciabile", ordine:"passeriformi", famiglia:"corvidi" },
+    { specie:"nocciolaia", stato:"protetta", ordine:"passeriformi", famiglia:"corvidi" },
+    { specie:"fringuello", stato:"protetta", ordine:"passeriformi", famiglia:"fringillidi" },
+    { specie:"peppola", stato:"protetta", ordine:"passeriformi", famiglia:"fringillidi" },
+    { specie:"organetto", stato:"protetta", ordine:"passeriformi", famiglia:"fringillidi" },
+    { specie:"fanello", stato:"protetta", ordine:"passeriformi", famiglia:"fringillidi" },
+    { specie:"crociere", stato:"protetta", ordine:"passeriformi", famiglia:"fringillidi" },
+    { specie:"verdone", stato:"protetta", ordine:"passeriformi", famiglia:"fringillidi" },
+    { specie:"frosone", stato:"protetta", ordine:"passeriformi", famiglia:"fringillidi" },
+    { specie:"cardellino", stato:"protetta", ordine:"passeriformi", famiglia:"fringillidi" },
+    { specie:"lucherino", stato:"protetta", ordine:"passeriformi", famiglia:"fringillidi" },
+    { specie:"zigolo giallo", stato:"protetta", ordine:"passeriformi", famiglia:"emberizidi" },
+    { specie:"migliarino di palude", stato:"protetta", ordine:"passeriformi", famiglia:"emberizidi" },
+    { specie:"strillozzo", stato:"protetta", ordine:"passeriformi", famiglia:"emberizidi" },
+    { specie:"picchio muratore", stato:"protetta", ordine:"passeriformi", famiglia:"sittidi" }
+];
+
+
+/* ===========================
+   VARIABILI STATO
+   =========================== */
+let current = null;
+let statsCorrect = 0;
+let statsWrong = 0;
+
+const modeStats = {
+    legge_regionale: { correct: 0, wrong: 0 },
+    legge_nazionale: { correct: 0, wrong: 0 },
+    leggi_tutte:     { correct: 0, wrong: 0 },
+    specie_cacciabili:{ correct: 0, wrong: 0 },
+    specie_tutte:    { correct: 0, wrong: 0 },
+    misturone:       { correct: 0, wrong: 0 }
+};
+
+/* MENU MOBILE */
+$("mobileMenuBtn").onclick = () => {
+    $("sidebar").classList.toggle("open");
+};
+
+/* SOLO ACCURATEZZA (barra rimossa) */
+function updateProgressBar(mode) {
+    if (!modeStats[mode]) {
+        $("accuracyText").style.display = "none";
+        return;
+    }
+
+    $("accuracyText").style.display = "block";
+
+    let c = modeStats[mode].correct;
+    let w = modeStats[mode].wrong;
+    let total = c + w;
+    let accuracy = total > 0 ? (c / total) * 100 : 0;
+    $("accuracyText").textContent = "Accuratezza: " + accuracy.toFixed(1) + "%";
+}
+
+/* NUOVA DOMANDA */
+function newQuestion() {
+    $("answer").textContent = "";
+    $("speciesImage").style.display = "none";
+
+    const mode = $("modeSelect").value;
+    let pool = [];
+
+    // aggiorna accuratezza per la modalità corrente
+    updateProgressBar(mode);
+
+    // modalità STATISTICHE
+    if (mode === "stats") {
+        let total = statsCorrect + statsWrong;
+        let perc = total > 0 ? ((statsCorrect / total) * 100).toFixed(1) : 0;
+
+        $("questionText").textContent = "Statistiche attuali:";
+        $("answer").textContent =
+            "Risposte corrette: " + statsCorrect +
+            "\nRisposte sbagliate: " + statsWrong +
+            "\nTotale risposte: " + total +
+            "\nPercentuale successo: " + perc + "%";
+        return;
+    }
+
+    if (mode === "legge_regionale") pool = LEGGE_REGIONALE;
+    if (mode === "legge_nazionale") pool = LEGGE_NAZIONALE;
+    if (mode === "leggi_tutte")     pool = [...LEGGE_REGIONALE, ...LEGGE_NAZIONALE];
+
+    if (mode === "specie_cacciabili") pool = SPECIES.filter(s => s.stato === "cacciabile");
+    if (mode === "specie_tutte")      pool = SPECIES;
+    if (mode === "misturone")         pool = [...LEGGE_REGIONALE, ...LEGGE_NAZIONALE, ...SPECIES];
+
+    if (pool.length === 0) {
+        $("questionText").textContent = "Nessuna domanda disponibile per questa modalità.";
+        return;
+    }
+
+    const item = pool[Math.floor(Math.random() * pool.length)];
+    current = item;
+
+    if (item.specie) {
+        $("questionText").textContent = "Riconosci la specie mostrata in foto.";
+
+        const index = SPECIES.findIndex(s => s.specie === item.specie);
+        if (index !== -1) loadSpeciesImage(index);
+        else $("speciesImage").style.display = "none";
+    } else {
+        $("questionText").textContent = item.domanda;
+    }
+}
+
+/* MOSTRA RISPOSTA */
+function reveal() {
+    if (!current) return;
+
+    if (current.specie) {
+    let txt = "";
+
+    if (current.ordine)   txt += `Ordine: ${current.ordine}\n`;
+    if (current.famiglia) txt += `Famiglia: ${current.famiglia}\n`;
+
+    txt += `Specie: ${current.specie}\n`;
+    txt += `Stato: ${current.stato}`;
+
+    $("answer").textContent = txt;
+}
+ else {
+        $("answer").textContent = current.risposta;
+    }
+}
+
+/* CARICA FOTO */
+function loadSpeciesImage(index) {
+    const num = String(index + 1).padStart(3, "0");
+    const path = `foto/${num}.jpg`;
+
+    $("speciesImage").style.display = "block";
+    $("imgEl").style.display = "none";
+    $("imgLoading").style.display = "block";
+    $("imgLoading").textContent = "Carico immagine…";
+
+    $("imgEl").src = path;
+
+    $("imgEl").onload = () => {
+        $("imgLoading").style.display = "none";
+        $("imgEl").style.display = "block";
+    };
+
+    $("imgEl").onerror = () => {
+        $("imgLoading").textContent = "Immagine non trovata.";
+    };
+}
+
+/* EVENTI PULSANTI */
+$("btnNew").onclick = newQuestion;
+$("btnReveal").onclick = reveal;
+$("btnNewCenter").onclick = newQuestion;
+$("btnRevealCenter").onclick = reveal;
+
+// cambio modalità: aggiorna accuratezza e pulisce schermo
+$("modeSelect").onchange = () => {
+    current = null;
+    $("answer").textContent = "";
+    $("speciesImage").style.display = "none";
+    updateProgressBar($("modeSelect").value);
+};
+
+// GIUSTO / SBAGLIATO
+$("btnCorrect").onclick = () => {
+    const mode = $("modeSelect").value;
+    if (modeStats[mode]) modeStats[mode].correct++;
+    statsCorrect++;
+    updateProgressBar(mode);
+    newQuestion();
+};
+
+$("btnWrong").onclick = () => {
+    const mode = $("modeSelect").value;
+    if (modeStats[mode]) modeStats[mode].wrong++;
+    statsWrong++;
+    updateProgressBar(mode);
+    newQuestion();
+};
+
+// RESET STATISTICHE
+$("btnReset").onclick = () => {
+    statsCorrect = 0;
+    statsWrong = 0;
+
+    for (let m in modeStats) {
+        modeStats[m].correct = 0;
+        modeStats[m].wrong = 0;
+    }
+
+    const mode = $("modeSelect").value;
+    updateProgressBar(mode);
+    newQuestion();
+};
+
+// inizializza accuratezza sulla modalità di default
+updateProgressBar($("modeSelect").value);
+</script>
+
+</body>
+</html>
